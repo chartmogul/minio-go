@@ -41,8 +41,6 @@ import (
 	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/minio/minio-go/pkg/s3signer"
 	"github.com/minio/minio-go/pkg/s3utils"
-	"github.com/paulbellamy/ratecounter"
-	"github.com/sirupsen/logrus"
 )
 
 //RequestRateLoggingTh - request rate logging threshold
@@ -91,17 +89,16 @@ type Client struct {
 	// default to Auto.
 	lookup BucketLookupType
 
-	log     logrus.FieldLogger
-	counter *ratecounter.RateCounter
+	preReqCallback func(*http.Request)
 }
 
 // Options for New method
 type Options struct {
-	Creds        *credentials.Credentials
-	Secure       bool
-	Region       string
-	BucketLookup BucketLookupType
-	Log          logrus.FieldLogger
+	Creds          *credentials.Credentials
+	Secure         bool
+	Region         string
+	BucketLookup   BucketLookupType
+	PreReqCallback func(*http.Request)
 	// Add future fields here
 }
 
@@ -193,7 +190,7 @@ func NewWithOptions(endpoint string, opts *Options) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clnt.log = opts.Log
+	clnt.preReqCallback = opts.PreReqCallback
 	return clnt, nil
 }
 
@@ -321,8 +318,6 @@ func privateNew(endpoint string, creds *credentials.Credentials, secure bool, re
 	// by the SDK. When Auto is specified, DNS lookup is used for Amazon/Google cloud endpoints and Path for all other endpoints.
 	clnt.lookup = lookup
 
-	//recording events-per-1second
-	clnt.counter = ratecounter.NewRateCounter(1 * time.Second)
 	// Return.
 	return clnt, nil
 }
@@ -509,9 +504,8 @@ func (c Client) dumpHTTP(req *http.Request, resp *http.Response) error {
 
 // do - execute http request.
 func (c Client) do(req *http.Request) (*http.Response, error) {
-	c.counter.Incr(1)
-	if c.counter.Rate() > RequestRateLoggingTh {
-		c.log.Warnf("minio requests-per-second execceded %d", RequestRateLoggingTh)
+	if c.preReqCallback != nil {
+		c.preReqCallback(req)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
