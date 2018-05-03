@@ -43,9 +43,6 @@ import (
 	"github.com/minio/minio-go/pkg/s3utils"
 )
 
-//RequestRateLoggingTh - request rate logging threshold
-var RequestRateLoggingTh = int64(100)
-
 // Client implements Amazon S3 compatible methods.
 type Client struct {
 	///  Standard options.
