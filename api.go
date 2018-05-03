@@ -85,14 +85,17 @@ type Client struct {
 	// lookup indicates type of url lookup supported by server. If not specified,
 	// default to Auto.
 	lookup BucketLookupType
+
+	preReqCallback func(*http.Request)
 }
 
 // Options for New method
 type Options struct {
-	Creds        *credentials.Credentials
-	Secure       bool
-	Region       string
-	BucketLookup BucketLookupType
+	Creds          *credentials.Credentials
+	Secure         bool
+	Region         string
+	BucketLookup   BucketLookupType
+	PreReqCallback func(*http.Request)
 	// Add future fields here
 }
 
@@ -180,7 +183,12 @@ func NewWithRegion(endpoint, accessKeyID, secretAccessKey string, secure bool, r
 
 // NewWithOptions - instantiate minio client with options
 func NewWithOptions(endpoint string, opts *Options) (*Client, error) {
-	return privateNew(endpoint, opts.Creds, opts.Secure, opts.Region, opts.BucketLookup)
+	clnt, err := privateNew(endpoint, opts.Creds, opts.Secure, opts.Region, opts.BucketLookup)
+	if err != nil {
+		return nil, err
+	}
+	clnt.preReqCallback = opts.PreReqCallback
+	return clnt, nil
 }
 
 // lockedRandSource provides protected rand source, implements rand.Source interface.
@@ -306,6 +314,7 @@ func privateNew(endpoint string, creds *credentials.Credentials, secure bool, re
 	// Sets bucket lookup style, whether server accepts DNS or Path lookup. Default is Auto - determined
 	// by the SDK. When Auto is specified, DNS lookup is used for Amazon/Google cloud endpoints and Path for all other endpoints.
 	clnt.lookup = lookup
+
 	// Return.
 	return clnt, nil
 }
@@ -492,6 +501,9 @@ func (c Client) dumpHTTP(req *http.Request, resp *http.Response) error {
 
 // do - execute http request.
 func (c Client) do(req *http.Request) (*http.Response, error) {
+	if c.preReqCallback != nil {
+		c.preReqCallback(req)
+	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		// Handle this specifically for now until future Golang versions fix this issue properly.
