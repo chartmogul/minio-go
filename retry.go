@@ -101,6 +101,10 @@ func isNetErrorRetryable(err error) bool {
 			if strings.Contains(err.Error(), "Connection closed by foreign host") {
 				return true
 			}
+			// when remote server is unreachable
+			if strings.Contains(err.Error(), "connection refused") {
+				return true
+			}
 		default:
 			if strings.Contains(err.Error(), "net/http: TLS handshake timeout") {
 				// If error is - tlsHandshakeTimeoutError, retry.
