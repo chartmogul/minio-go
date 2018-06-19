@@ -105,6 +105,10 @@ func isNetErrorRetryable(err error) bool {
 			if strings.Contains(err.Error(), "connection refused") {
 				return true
 			}
+			// when writing to a closed connection
+			if strings.Contains(err.Error(), "write: broken pipe") {
+				return true
+			}
 		default:
 			if strings.Contains(err.Error(), "net/http: TLS handshake timeout") {
 				// If error is - tlsHandshakeTimeoutError, retry.
